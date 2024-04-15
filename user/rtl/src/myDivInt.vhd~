@@ -1,0 +1,125 @@
+library ieee;
+use ieee.std_logic_1164.all;
+use IEEE.NUMERIC_STD.all;
+library work;
+use work.utils_pkg.all;
+
+entity mydivider is
+  generic (
+    REGISTER_SIZE : positive range 32 to 32
+    );
+  port (
+    clk            : in  std_logic;
+    div_enable     : in  std_logic;
+    div_unsigned   : in  std_logic;
+    rs1_data       : in  std_logic_vector(REGISTER_SIZE-1 downto 0);
+    rs2_data       : in  std_logic_vector(REGISTER_SIZE-1 downto 0);
+    quotient       : out std_logic_vector(REGISTER_SIZE-1 downto 0);
+    remainder      : out std_logic_vector(REGISTER_SIZE-1 downto 0);
+    from_div_valid : out std_logic
+    );
+end entity;
+
+architecture rtl of mydivider is
+  type div_state is (IDLE, DIVIDING, DONE);
+  signal state       : div_state;
+  signal count       : natural range REGISTER_SIZE-1 downto 0;
+  signal numerator   : unsigned(REGISTER_SIZE-1 downto 0);
+  signal denominator : unsigned(REGISTER_SIZE-1 downto 0);
+
+  signal div_neg_op1       : std_logic;
+  signal div_neg_op2       : std_logic;
+  signal div_neg_quotient  : std_logic;
+  signal div_neg_remainder : std_logic;
+
+  signal div_by_zero  : boolean;
+  signal div_overflow : boolean;
+
+  signal div_res    : unsigned(REGISTER_SIZE-1 downto 0);
+  signal rem_res    : unsigned(REGISTER_SIZE-1 downto 0);
+  signal min_signed : signed(REGISTER_SIZE-1 downto 0);
+begin
+
+  div_neg_op1 <= not div_unsigned when signed(rs1_data) < 0 else '0';
+  div_neg_op2 <= not div_unsigned when signed(rs2_data) < 0 else '0';
+
+  min_signed(min_signed'left)            <= '1';
+  min_signed(min_signed'left-1 downto 0) <= (others => '0');
+
+  div_by_zero <= unsigned(rs2_data) = to_unsigned(0, REGISTER_SIZE);
+  div_overflow <= (signed(rs1_data) = min_signed and
+                   signed(rs2_data) = to_signed(-1, REGISTER_SIZE) and
+                   div_unsigned = '0');
+
+
+  numerator   <= unsigned(rs1_data) when div_neg_op1 = '0' else unsigned(-signed(rs1_data));
+  denominator <= unsigned(rs2_data) when div_neg_op2 = '0' else unsigned(-signed(rs2_data));
+
+
+  div_proc : process(clk)
+    variable D     : unsigned(REGISTER_SIZE-1 downto 0);
+    variable N     : unsigned(REGISTER_SIZE-1 downto 0);
+    variable R     : unsigned(REGISTER_SIZE-1 downto 0);
+    variable Q     : unsigned(REGISTER_SIZE-1 downto 0);
+    variable sub   : unsigned(REGISTER_SIZE downto 0);
+    variable Q_lsb : std_logic;
+  begin
+
+    if rising_edge(clk) then
+      from_div_valid <= '0';
+      if div_enable = '1' then
+        case state is
+          when IDLE =>
+            div_neg_quotient  <= div_neg_op2 xor div_neg_op1;
+            div_neg_remainder <= div_neg_op1;
+            D                 := denominator;
+            N                 := numerator;
+            R                 := (others => '0');
+            if div_by_zero then
+              Q                 := (others => '1');
+              R                 := unsigned(rs1_data);
+              from_div_valid    <= '1';
+              div_neg_remainder <= '0';
+              div_neg_quotient  <= '0';
+            elsif div_overflow then
+              Q                 := unsigned(min_signed);
+              from_div_valid    <= '1';
+              div_neg_remainder <= '0';
+              div_neg_quotient  <= '0';
+            else
+              state <= DIVIDING;
+              count <= Q'length - 1;
+            end if;
+          when DIVIDING =>
+            R(REGISTER_SIZE-1 downto 1) := R(REGISTER_SIZE-2 downto 0);
+            R(0)                        := N(N'left);
+            N                           := SHIFT_LEFT(N, 1);
+
+            Q_lsb := '0';
+            sub   := ("0"&R)-("0"&D);
+            if sub(sub'left) = '0' then
+              R     := sub(R'range);
+              Q_lsb := '1';
+            end if;
+            Q := Q(Q'left-1 downto 0) & Q_lsb;
+            if count /= 0 then
+              count <= count - 1;
+            else
+              from_div_valid <= '1';
+              state          <= DONE;
+            end if;
+          when DONE =>
+            state <= IDLE;
+        end case;
+        div_res <= Q;
+        rem_res <= R;
+      else
+        state <= IDLE;
+      end if;
+
+    end if;  -- clk
+  end process;
+
+  remainder <= std_logic_vector(rem_res) when div_neg_remainder = '0' else std_logic_vector(-signed(rem_res));
+  quotient  <= std_logic_vector(div_res) when div_neg_quotient = '0'  else std_logic_vector(-signed(div_res));
+end architecture rtl;
