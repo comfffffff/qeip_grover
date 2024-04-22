@@ -22,7 +22,7 @@ module TEST1_APB
 parameter BW_DATA = 1;
 parameter BW_ADDR = 1;
 
-parameter NUM_QUBIT = 5; // #qubits up to 10
+parameter NUM_QUBIT = 4; // #qubits up to 10
 
 localparam NUM_STATE = 2**NUM_QUBIT;
 localparam NUM_TABLE = NUM_QUBIT-$clog2(BW_DATA)>0 ?
@@ -92,8 +92,8 @@ wire[BW_DATA-1:0] init_entry = (NUM_QUBIT % 2 == 0) ?
 // amp_state[29:0] : fraction bit
 reg[32*NUM_STATE-1:0] amp_state; 
 
-reg[NUM_TABLE_BIT-1:0] func_table;
-reg[NUM_TABLE-1:0] func_table_we; 
+reg[(NUM_QUBIT+1)-1:0] func_table;
+reg func_table_we; 
 // reg[NUM_QUBIT-1:0] t; // arbitrary iteration time
 
 // Signals for subroutines
@@ -141,13 +141,13 @@ begin
             
             // access to func_table
             // #qubits up to 10 due to this
-            4'h0, 4'h1:
+            4'h0:
             begin
                 if(addr_offset[1:0] == 0)
                     is_valid_addr = 1;
                 else   
                     is_valid_addr = 0;
-                func_table_we[addr_offset[5:2]] = rpwrite;
+                func_table_we = rpwrite;
             end
 
             // activate grover's algorithm
@@ -185,19 +185,13 @@ always@ (posedge clk, negedge rstnn)
 begin
     if(rstnn == 0)
     begin
-        for(j=0; j<NUM_TABLE; j=j+1)
-        begin
-            func_table[j] <= 0;
-        end
+        func_table <= 0;
     end
     else 
     begin
-        for(j=0; j<NUM_TABLE; j=j+1)
+        if(func_table_we)
         begin
-            if(func_table_we[j])
-            begin
-                func_table[BW_DATA*(j+1)-1 -: BW_DATA] <= rpwdata;
-            end
+            func_table <= rpwdata;
         end
     end
 end
@@ -361,7 +355,7 @@ begin
             ORACLE:
             begin
                 for(j=0; j<NUM_STATE; j=j+1)
-                    if(func_table[j]) amp_state[32*(j+1)-1 -: 32] <= -amp_state[32*(j+1)-1 -: 32];
+                    if(func_table == j) amp_state[32*(j+1)-1 -: 32] <= -amp_state[32*(j+1)-1 -: 32];
                 
                 iteration <= iteration + 1;
             end

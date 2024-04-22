@@ -179,9 +179,9 @@ begin
                 begin
                     acc_weight[WEIGHT_WIDTH*(j+1+(1<<acc_stage))-1 -: WEIGHT_WIDTH] <= 
                         acc_weight[WEIGHT_WIDTH*(j+1+(1<<acc_stage))-1 -: WEIGHT_WIDTH] + acc_weight[WEIGHT_WIDTH*(j+1)-1 -: WEIGHT_WIDTH];
-                        $display("j = %0d\n",j);
+                        //$display("j = %0d\n",j);
                 end
-                $display("acc_stage = %0d\n\n", acc_stage);
+                //$display("acc_stage = %0d\n\n", acc_stage);
                 acc_stage <= acc_stage + 1;
                 
             end

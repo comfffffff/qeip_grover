@@ -1,1 +1,1 @@
-get /home/cau1_wjlee12/rvx_devkit/sim_rtl.tar.gz
+get /home/cau1_wjlee12/rvx_devkit/imp_fpga.tar.gz

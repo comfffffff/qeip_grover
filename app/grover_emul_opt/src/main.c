@@ -15,10 +15,10 @@ static inline unsigned int get_addr(unsigned int offset)
 
 // table_num = 0,1,2, ... ,15
 // ex) f(32*1 + 3) = 1 >> table_num = 1, table_bits = 0000....0100
-void set_func_table(unsigned int table_num, unsigned int table_bits)
+void set_func_table(unsigned int table_bits)
 {
     // alligned access of riscv core
-    REG32(get_addr(OFFSET_FUNC_TABLE) + table_num * 4) = table_bits;
+    REG32(get_addr(OFFSET_FUNC_TABLE)) = table_bits;
 }
 
 int activate_grover_search(void)
@@ -36,15 +36,14 @@ int main(void)
     int result = 0;
     // clock_t begin, end;
 
-    func_table_index = 0x00000001;
+    func_table_index = -1;
 
 
 
-    for(j = 0; j < 8; j++)
+    for(j = 0; j <= 8; j++)
     {
-        set_func_table(0,func_table_index);
+        set_func_table(j-1);
         result = activate_grover_search();
-        func_table_index = func_table_index << 1;
 
         // printf("result = %d", result);
     }
